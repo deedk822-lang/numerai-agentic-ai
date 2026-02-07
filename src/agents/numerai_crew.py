@@ -1,0 +1,154 @@
+from crewai import Agent, Task, Crew, Process
+from typing import List, Dict
+import logging
+
+logger = logging.getLogger(__name__)
+
+class NumeraiAgentCrew:
+    """
+    CrewAI orchestration for Numerai signal generation
+    
+    Agents:
+    1. Data Analyst - Analyzes market data and SEC filings
+    2. Financial Researcher - Researches company fundamentals
+    3. Signal Generator - Generates Numerai predictions
+    4. Fact Checker - Verifies claims and data quality
+    """
+    
+    def __init__(self, perplexity_devkit, finnhub_fetcher, qwen_model):
+        self.perplexity = perplexity_devkit
+        self.finnhub = finnhub_fetcher
+        self.qwen = qwen_model
+        
+        # Initialize agents
+        self.data_analyst = self._create_data_analyst()
+        self.financial_researcher = self._create_financial_researcher()
+        self.signal_generator = self._create_signal_generator()
+        self.fact_checker = self._create_fact_checker()
+    
+    def _create_data_analyst(self) -> Agent:
+        """Agent specializing in market data analysis"""
+        return Agent(
+            role='Data Analyst',
+            goal='Analyze market news, SEC filings, and price data to identify trends',
+            backstory="""You are an expert data analyst with 15 years of experience 
+            analyzing financial markets. You excel at identifying patterns in news 
+            sentiment and SEC filing data.""",
+            verbose=True,
+            allow_delegation=False,
+            tools=[]
+        )
+    
+    def _create_financial_researcher(self) -> Agent:
+        """Agent specializing in fundamental analysis"""
+        return Agent(
+            role='Financial Researcher',
+            goal='Research company fundamentals and financial metrics',
+            backstory="""You are a seasoned financial researcher who specializes 
+            in fundamental analysis. You have deep expertise in reading financial 
+            statements and understanding company valuation.""",
+            verbose=True,
+            allow_delegation=False,
+            tools=[]
+        )
+    
+    def _create_signal_generator(self) -> Agent:
+        """Agent specializing in Numerai signal generation"""
+        return Agent(
+            role='Signal Generator',
+            goal='Generate high-quality Numerai predictions based on research',
+            backstory="""You are a quantitative analyst specializing in the Numerai 
+            tournament. You understand the unique requirements of Numerai signals 
+            and how to generate predictions that perform well.""",
+            verbose=True,
+            allow_delegation=False,
+            tools=[]
+        )
+    
+    def _create_fact_checker(self) -> Agent:
+        """Agent specializing in fact verification"""
+        return Agent(
+            role='Fact Checker',
+            goal='Verify all claims and data quality before signal submission',
+            backstory="""You are a meticulous fact-checker who ensures all data 
+            is accurate and all claims are verified. You use LOKI and OpenFactCheck 
+            to validate information.""",
+            verbose=True,
+            allow_delegation=False,
+            tools=[]
+        )
+    
+    def generate_signals(self, tickers: List[str]) -> Dict:
+        """Main workflow to generate Numerai signals"""
+        
+        logger.info(f"Generating signals for {len(tickers)} tickers")
+        
+        # Task 1: Analyze market data
+        analyze_task = Task(
+            description=f"""Analyze market news and SEC filings for: {', '.join(tickers[:5])}
+            
+            1. Fetch latest news using Perplexity batch search
+            2. Retrieve SEC 10-Q filings for recent quarters
+            3. Identify key trends, sentiment, and risks
+            4. Summarize findings in structured format
+            """,
+            agent=self.data_analyst,
+            expected_output="Structured analysis with news sentiment and SEC insights"
+        )
+        
+        # Task 2: Research fundamentals
+        research_task = Task(
+            description=f"""Research company fundamentals for: {', '.join(tickers[:5])}
+            
+            1. Fetch financial metrics using Finnhub
+            2. Extract P/E ratio, revenue growth, EPS
+            3. Compare against sector averages
+            4. Identify undervalued or overvalued stocks
+            """,
+            agent=self.financial_researcher,
+            expected_output="Financial metrics comparison table"
+        )
+        
+        # Task 3: Generate signals
+        signal_task = Task(
+            description="""Generate Numerai signals based on analysis and research
+            
+            1. Combine news sentiment with fundamental metrics
+            2. Apply Numerai-specific scoring methodology
+            3. Generate predictions for each ticker
+            4. Ensure signals meet Numerai format requirements
+            """,
+            agent=self.signal_generator,
+            expected_output="Numerai signals in required format"
+        )
+        
+        # Task 4: Fact check
+        verify_task = Task(
+            description="""Verify all data and signals before submission
+            
+            1. Check data quality scores
+            2. Verify SEC filing dates and accuracy
+            3. Validate signal ranges and formatting
+            4. Run LOKI fact-checking on key claims
+            """,
+            agent=self.fact_checker,
+            expected_output="Verification report with quality score"
+        )
+        
+        # Create crew and execute
+        crew = Crew(
+            agents=[
+                self.data_analyst,
+                self.financial_researcher,
+                self.signal_generator,
+                self.fact_checker
+            ],
+            tasks=[analyze_task, research_task, signal_task, verify_task],
+            process=Process.sequential,
+            verbose=True
+        )
+        
+        result = crew.kickoff()
+        
+        logger.info("Signal generation complete")
+        return result
