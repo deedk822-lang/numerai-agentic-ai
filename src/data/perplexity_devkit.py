@@ -1,21 +1,20 @@
 from perplexity import Perplexity
-from typing import List, Dict, Literal
+from typing import List, Dict, Literal, Optional, Union
 import json
 import logging
 from datetime import datetime
+import asyncio
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class PerplexityNumeraiDevKit:
     """
-    Production fetcher for Numerai + Phase 2 improvements:
-    - Batch queries (5/request) for efficiency
-    - SEC search mode for 10-K/10-Q filing data
-    - Domain filtering for curated sources
-    - Structured JSON output for signal generation
-    - Error handling + rate limiting
-    - Performance monitoring (Phase 2)
+    Production fetcher for Numerai + Phase 2 improvements using Perplexity Agentic Research API:
+    - Unified 'responses.create' endpoint
+    - Batch queries via sequential tool calls (Agentic behavior)
+    - SEC filing access via web_search tool and specific instructions
+    - Structured JSON output via instructions and response parsing
     """
     
     def __init__(self, api_key: str):
@@ -31,15 +30,16 @@ class PerplexityNumeraiDevKit:
             "errors": []
         }
     
-    # ============ NEWS FETCHING (Batch) ============
+    # ============ NEWS FETCHING (Agentic) ============
     
     def batch_market_news(self, queries: List[str], max_results: int = 5) -> Dict:
         """
-        Batch fetch market news with domain filtering
+        Batch fetch market news using the Agentic Research API.
+        Simulates batching by processing queries sequentially or concurrently.
         
         Args:
             queries: Up to 5 queries (e.g., "AAPL earnings", "MSFT AI")
-            max_results: Results per query
+            max_results: Results per query (handled via instructions)
         
         Returns:
             {query: [{headline, url, summary, source, sentiment}, ...]}
@@ -48,137 +48,127 @@ class PerplexityNumeraiDevKit:
         if len(queries) > 5:
             logger.warning(f"Max 5 queries. Splitting {len(queries)} queries.")
             queries = queries[:5]
+            
+        results = {}
         
-        try:
-            start = datetime.now()
-            
-            search_results = self.client.search.create(
-                query=queries,
-                max_results=max_results,
-                max_tokens_per_page=2048,
-                # Phase 1: News filtering
-                search_domain_filter=[
-                    "cnbc.com",
-                    "bloomberg.com",
-                    "reuters.com",
-                    "marketwatch.com",
-                    "investor.com"
-                ]
-            )
-            
-            parsed = self._parse_batch_results(search_results, queries)
-            latency = (datetime.now() - start).total_seconds() * 1000
-            
-            # Phase 2: Performance monitoring
-            self._record_metric(len(queries), latency, "news_batch")
-            
-            return parsed
-            
-        except Exception as e:
-            logger.error(f"Batch news error: {e}")
-            self.perf_metrics["errors"].append({
-                "type": "batch_news",
-                "message": str(e),
-                "timestamp": datetime.now().isoformat()
-            })
-            return {}
+        # Note: In a real async environment we'd use asyncio.gather, but keeping synchronous for compatibility
+        # with the existing synchronous class structure. 
+        for query in queries:
+            try:
+                start = datetime.now()
+                
+                # Agentic Research API call
+                # We use instructions to enforce domain filtering and format
+                instructions = (
+                    "You are a financial news analyst. Use the web_search tool to find the latest market news. "
+                    "Focus ONLY on trusted financial domains like cnbc.com, bloomberg.com, reuters.com, marketwatch.com. "
+                    f"Provide {max_results} distinct news items. "
+                    "Format the output as a JSON list of objects with keys: headline, url, summary, source, sentiment (float -1 to 1)."
+                )
+                
+                response = self.client.responses.create(
+                    model="sonar-pro", # Using a strong model for reasoning
+                    input=query,
+                    tools=[{"type": "web_search"}],
+                    instructions=instructions
+                )
+                
+                # Parse the output text which should be JSON due to instructions
+                # In a robust system we'd use 'response_format' if supported or a robust parser
+                parsed_data = self._parse_agentic_response(response.output_text)
+                
+                results[query] = parsed_data
+                
+                latency = (datetime.now() - start).total_seconds() * 1000
+                self._record_metric(1, latency, "news_agentic")
+                
+            except Exception as e:
+                logger.error(f"News fetch error for {query}: {e}")
+                self.perf_metrics["errors"].append({
+                    "type": "news_agentic",
+                    "query": query,
+                    "message": str(e)
+                })
+                results[query] = []
+                
+        return results
     
-    # ============ SEC FILINGS (NEW - January 2026) ============
+    # ============ SEC FILINGS (Agentic) ============
     
     def fetch_sec_filings(self, ticker: str, filing_type: Literal["10-K", "10-Q", "8-K"] = "10-K") -> Dict:
         """
-        Fetch SEC filings directly via search_mode: "sec"
-        
-        Args:
-            ticker: Stock symbol (e.g., "AAPL")
-            filing_type: "10-K" (annual), "10-Q" (quarterly), "8-K" (current)
-        
-        Returns:
-            {filing_type, company, period, revenue, net_income, key_metrics, ...}
+        Fetch SEC filings using Agentic Research API with specific SEC instructions
         """
         
-        query = f"{ticker} {filing_type} 2025"
+        query = f"Find the latest {filing_type} filing for {ticker} from 2025 or 2026."
+        instructions = (
+            "You are an SEC filing researcher. Use web_search to find the specific filing on sec.gov or credible financial sites. "
+            "Extract the following fields and return as a JSON object: "
+            "filing_type, company, filed_date, url, and a brief snippet/summary of key financial results."
+        )
         
         try:
             start = datetime.now()
             
-            # NEW: SEC search mode
-            sec_results = self.client.search.create(
-                query=query,
-                search_mode="sec",  # Direct SEC access
-                max_results=1,  # Get most recent filing
-                max_tokens_per_page=4096
+            response = self.client.responses.create(
+                model="sonar-reasoning-pro", # Use reasoning model for complex SEC data
+                input=query,
+                tools=[{"type": "web_search"}],
+                instructions=instructions
             )
             
-            # Parse structured financial data
-            filing_data = self._extract_sec_metrics(
-                sec_results.results[0] if sec_results.results else {},
-                ticker,
-                filing_type
-            )
+            filing_data = self._parse_agentic_response(response.output_text)
+            # Add metadata
+            if isinstance(filing_data, dict):
+                filing_data["ticker"] = ticker
             
             latency = (datetime.now() - start).total_seconds() * 1000
-            self._record_metric(1, latency, "sec_filing")
+            self._record_metric(1, latency, "sec_filing_agentic")
             
-            return filing_data
+            return filing_data if isinstance(filing_data, dict) else {}
             
         except Exception as e:
             logger.error(f"SEC filing error: {e}")
             self.perf_metrics["errors"].append({
-                "type": "sec_filing",
+                "type": "sec_filing_agentic",
                 "ticker": ticker,
                 "message": str(e)
             })
             return {}
     
-    # ============ FINANCIAL DATA (Structured JSON Output) ============
+    # ============ FINANCIAL DATA (Agentic Extraction) ============
     
     def extract_financial_metrics(self, company_name: str, context_html: str = "") -> Dict:
         """
-        Extract structured financial metrics using JSON mode
-        
-        Args:
-            company_name: Company to analyze
-            context_html: Optional HTML content to analyze
-        
-        Returns:
-            {pe_ratio, price_to_book, dividend_yield, 52w_high, 52w_low, ...}
+        Extract structured financial metrics using Agentic API
         """
         
-        prompt = f"""Extract financial metrics for {company_name}:
-        {context_html if context_html else "Search current data"}
+        query = f"Get current financial metrics for {company_name}."
         
-        Return ONLY valid JSON:
-        {{
-            "company": "{company_name}",
-            "pe_ratio": 28.5,
-            "price_to_book": 45.2,
-            "dividend_yield": 0.42,
-            "52week_high": 195.87,
-            "52week_low": 152.34,
-            "market_cap_billions": 3200,
-            "revenue_growth_yoy": 12.5,
-            "earnings_per_share": 6.05,
-            "data_quality": 0.95
-        }}"""
+        instructions = (
+            "You are a quantitative analyst. Use web_search to find current financial data. "
+            "Return ONLY a valid JSON object with the following keys: "
+            "company, pe_ratio, price_to_book, dividend_yield, 52week_high, 52week_low, "
+            "market_cap_billions, revenue_growth_yoy, earnings_per_share, data_quality (0-1 score). "
+            "Do not include any markdown formatting like ```json."
+        )
         
         try:
             start = datetime.now()
             
-            response = self.client.chat.create(
+            response = self.client.responses.create(
                 model="sonar-pro",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.1,  # Deterministic extraction
-                # NEW: Structured output mode
-                response_format={"type": "json_object"}
+                input=query,
+                tools=[{"type": "web_search"}],
+                instructions=instructions
             )
             
-            metrics = json.loads(response.choices[0].message.content)
+            metrics = self._parse_agentic_response(response.output_text)
             
             latency = (datetime.now() - start).total_seconds() * 1000
-            self._record_metric(1, latency, "extraction")
+            self._record_metric(1, latency, "extraction_agentic")
             
-            return metrics
+            return metrics if isinstance(metrics, dict) else {}
             
         except Exception as e:
             logger.error(f"Extraction error: {e}")
@@ -186,75 +176,30 @@ class PerplexityNumeraiDevKit:
     
     # ============ HELPER METHODS ============
     
-    def _parse_batch_results(self, response, queries: List[str]) -> Dict:
-        """Parse batch search results"""
-        
-        parsed = {}
-        
-        if isinstance(response.results[0], list):
-            for i, batch in enumerate(response.results):
-                parsed[queries[i]] = [
-                    {
-                        "headline": r.title,
-                        "url": r.url,
-                        "summary": r.snippet[:150],
-                        "source": self._extract_domain(r.url),
-                        "published_date": getattr(r, 'published_date', None),
-                        "timestamp": datetime.now().isoformat()
-                    }
-                    for r in batch
-                ]
-        else:
-            parsed[queries[0]] = [
-                {
-                    "headline": r.title,
-                    "url": r.url,
-                    "summary": r.snippet[:150],
-                    "source": self._extract_domain(r.url)
-                }
-                for r in response.results
-            ]
-        
-        return parsed
-    
-    def _extract_sec_metrics(self, filing_result, ticker: str, filing_type: str) -> Dict:
-        """Extract key metrics from SEC filing"""
-        
-        return {
-            "ticker": ticker,
-            "filing_type": filing_type,
-            "company": filing_result.get("title", ""),
-            "url": filing_result.get("url", ""),
-            "filed_date": getattr(filing_result, 'published_date', None),
-            "snippet": filing_result.get("snippet", "")[:500]
-        }
-    
-    @staticmethod
-    def _extract_domain(url: str) -> str:
-        from urllib.parse import urlparse
-        return urlparse(url).netloc
-    
-    # ============ PHASE 2: MONITORING & METRICS ============
-    
+    def _parse_agentic_response(self, text: str) -> Union[Dict, List]:
+        """Attempt to parse JSON from the response text"""
+        try:
+            # Clean up potential markdown formatting
+            clean_text = text.replace("```json", "").replace("```", "").strip()
+            return json.loads(clean_text)
+        except json.JSONDecodeError:
+            logger.warning(f"Failed to parse JSON from response: {text[:100]}...")
+            return {"error": "parse_error", "raw_text": text}
+
     def _record_metric(self, requests: int, latency_ms: float, operation: str):
-        """Record performance metric (Phase 2 requirement)"""
-        
+        """Record performance metric"""
         self.perf_metrics["total_requests"] += requests
         self.perf_metrics["avg_latency_ms"].append(latency_ms)
-        
         logger.info(f"[{operation}] Requests: {requests}, Latency: {latency_ms:.1f}ms")
     
     def get_health_metrics(self) -> Dict:
-        """Return performance dashboard (Phase 2 monitoring)"""
-        
+        """Return performance dashboard"""
         avg_latency = (
             sum(self.perf_metrics["avg_latency_ms"]) / 
             len(self.perf_metrics["avg_latency_ms"])
             if self.perf_metrics["avg_latency_ms"] else 0
         )
-        
         uptime = (datetime.now() - self.start_time).total_seconds() / 3600
-        
         return {
             "total_requests": self.perf_metrics["total_requests"],
             "avg_latency_ms": avg_latency,

@@ -1,5 +1,5 @@
 # Core Dependencies
-perplexityai==1.2.0
+perplexityai>=1.2.0
 crewai==0.28.0
 finnhub-python==2.4.19
 vllm==0.3.2
