@@ -6,10 +6,10 @@ logger = logging.getLogger(__name__)
 
 class NumeraiAgentCrew:
     """
-    CrewAI orchestration for Numerai signal generation
+    CrewAI orchestration for Numerai signal generation using Agentic Research API
     
     Agents:
-    1. Data Analyst - Analyzes market data and SEC filings
+    1. Data Analyst - Analyzes market data and SEC filings via Perplexity Agentic API
     2. Financial Researcher - Researches company fundamentals
     3. Signal Generator - Generates Numerai predictions
     4. Fact Checker - Verifies claims and data quality
@@ -33,7 +33,8 @@ class NumeraiAgentCrew:
             goal='Analyze market news, SEC filings, and price data to identify trends',
             backstory="""You are an expert data analyst with 15 years of experience 
             analyzing financial markets. You excel at identifying patterns in news 
-            sentiment and SEC filing data.""",
+            sentiment and SEC filing data. You leverage the Perplexity Agentic Research API 
+            to find real-time, verified information.""",
             verbose=True,
             allow_delegation=False,
             tools=[]
@@ -83,12 +84,12 @@ class NumeraiAgentCrew:
         
         logger.info(f"Generating signals for {len(tickers)} tickers")
         
-        # Task 1: Analyze market data
+        # Task 1: Analyze market data (Agentic)
         analyze_task = Task(
             description=f"""Analyze market news and SEC filings for: {', '.join(tickers[:5])}
             
-            1. Fetch latest news using Perplexity batch search
-            2. Retrieve SEC 10-Q filings for recent quarters
+            1. Fetch latest news using Perplexity Agentic Research API (batch queries)
+            2. Retrieve SEC 10-Q filings for recent quarters via web_search
             3. Identify key trends, sentiment, and risks
             4. Summarize findings in structured format
             """,

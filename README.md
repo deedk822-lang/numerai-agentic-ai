@@ -1,7 +1,7 @@
 # Numerai Agentic AI - Production System
 
-**Status**: Phase 1 Core + Phase 2 Web Standards + Perplexity DevKit Integration  
-**Version**: 1.0.0  
+**Status**: Phase 1 Core + Phase 2 Web Standards + Perplexity Agentic Research API  
+**Version**: 1.1.0  
 **Date**: February 2026  
 **Target**: First signal submission within 7 days
 
@@ -9,7 +9,7 @@
 
 Production-grade agentic AI system for Numerai tournament participation featuring:
 
-- **Perplexity Pro Labs**: Real-time news + SEC filings + financial data extraction
+- **Perplexity Agentic Research API**: Unified interface for LLMs + web search + tools
 - **Finnhub Free Tier**: Company fundamentals (60 req/min)
 - **Qwen3-Flash Local**: vLLM inference (200ms latency, FREE)
 - **CrewAI**: Multi-agent orchestration
@@ -24,11 +24,12 @@ Production-grade agentic AI system for Numerai tournament participation featurin
 ├─────────────────────────────────────────────────────────────┤
 │  Data Sources           │  Processing         │  Output     │
 ├─────────────────────────┼─────────────────────┼─────────────┤
-│ • Perplexity Pro Labs   │ • Qwen3-Flash       │ • Numerai   │
-│   - News (Batch)        │   (vLLM, local)     │   Signals   │
-│   - SEC Filings         │ • CrewAI Agents     │             │
-│   - Financial Data      │ • LOKI Fact-Check   │ • Dashboard │
-│ • Finnhub API           │ • OpenFactCheck     │   (Phase 2) │
+│ • Perplexity Agentic    │ • Qwen3-Flash       │ • Numerai   │
+│   Research API          │   (vLLM, local)     │   Signals   │
+│   - Batch News          │ • CrewAI Agents     │             │
+│   - SEC Filings         │ • LOKI Fact-Check   │ • Dashboard │
+│   - Financial JSON      │ • OpenFactCheck     │   (Phase 2) │
+│ • Finnhub API           │                     │             │
 │   - Fundamentals        │                     │             │
 └─────────────────────────┴─────────────────────┴─────────────┘
 ```
@@ -43,7 +44,7 @@ pip install -r requirements.txt
 
 # Environment variables
 cp .env.example .env
-# Add: PERPLEXITY_API_KEY, FINNHUB_API_KEY, NUMERAI_PUBLIC_KEY, NUMERAI_SECRET_KEY
+# Add: PERPLEXITY_API_KEY (for Agentic API), FINNHUB_API_KEY, NUMERAI_*
 ```
 
 ### Installation
@@ -83,7 +84,7 @@ python src/signal_generator.py --date 2026-02-07
 numerai-agentic-ai/
 ├── src/
 │   ├── agents/              # CrewAI agent definitions
-│   ├── data/                # Data fetchers (Perplexity, Finnhub)
+│   ├── data/                # Data fetchers (Perplexity Agentic, Finnhub)
 │   ├── models/              # Qwen3 vLLM inference
 │   ├── verification/        # LOKI + OpenFactCheck
 │   ├── signals/             # Numerai signal generation
@@ -99,7 +100,7 @@ numerai-agentic-ai/
 
 | Component | Monthly Cost | Notes |
 |-----------|--------------|-------|
-| Perplexity Pro + API | $50-70 | Batch search + SEC filings |
+| Perplexity Pro + API | $50-70 | Agentic Research API usage |
 | Finnhub | $0 | Free tier: 60 req/min |
 | Qwen3 Models | $0 | Open-source, self-hosted |
 | Alibaba Cloud GPU | $100-300 | A100 ($300) or V100 ($100) |
@@ -199,7 +200,7 @@ MIT License - see [LICENSE](LICENSE) file
 
 ### Phase 1 (Complete)
 - ✅ Core infrastructure setup
-- ✅ Perplexity DevKit integration
+- ✅ Perplexity Agentic API integration
 - ✅ Multi-agent orchestration
 - ✅ Signal generation pipeline
 
