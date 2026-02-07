@@ -1,0 +1,49 @@
+# Core Dependencies
+perplexityai==1.2.0
+crewai==0.28.0
+finnhub-python==2.4.19
+vllm==0.3.2
+numerapi==2.18.0
+
+# LLM & ML
+transformers==4.37.2
+torch==2.2.0
+flash-attn==2.5.0
+
+# Data Processing
+pandas==2.2.0
+numpy==1.26.3
+scipy==1.12.0
+
+# Verification
+openfactcheck==0.1.5
+loki-verify==0.3.0
+
+# Web Standards (Phase 2)
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+
+# Monitoring (Phase 2)
+prometheus-client==0.19.0
+sentry-sdk==1.40.0
+
+# Security
+python-dotenv==1.0.1
+cryptography==42.0.0
+
+# Testing
+pytest==8.0.0
+pytest-cov==4.1.0
+pytest-asyncio==0.23.4
+
+# Code Quality
+black==24.1.1
+flake8==7.0.0
+mypy==1.8.0
+
+# Utilities
+requests==2.31.0
+aiohttp==3.9.3
+python-dateutil==2.8.2
+tqdm==4.66.1
